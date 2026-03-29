@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 
-type User = { username: string; password: string; };
+type User = {
+  username: string;
+  password: string;
+  photo?: string;
+};
 
 const App: React.FC = () => {
   const [page, setPage] = useState<"home" | "login" | "register" | "dashboard">("home");
@@ -18,11 +22,16 @@ const App: React.FC = () => {
   const [regError, setRegError] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
 
+  // Profile states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editPhoto, setEditPhoto] = useState<string | undefined>();
+
   // Load persistent login
   useEffect(() => {
     const savedUser = localStorage.getItem("currentUser");
     const savedUsers = localStorage.getItem("users");
-
     if (savedUsers) setUsers(JSON.parse(savedUsers));
     if (savedUser) {
       setCurrentUser(JSON.parse(savedUser));
@@ -44,6 +53,7 @@ const App: React.FC = () => {
     }
   }, [currentUser, rememberMe]);
 
+  // Login
   const handleLogin = () => {
     const user = users.find(u => u.username === loginUsername && u.password === loginPassword);
     if (user) {
@@ -57,6 +67,7 @@ const App: React.FC = () => {
     }
   };
 
+  // Register
   const handleRegister = () => {
     if (!regUsername || !regPassword) {
       setRegError("Enter username and password");
@@ -82,105 +93,139 @@ const App: React.FC = () => {
     localStorage.removeItem("currentUser");
   };
 
+  // Profile edit
+  const startEdit = () => {
+    if (!currentUser) return;
+    setEditUsername(currentUser.username);
+    setEditPassword(currentUser.password);
+    setEditPhoto(currentUser.photo);
+    setIsEditing(true);
+  };
+
+  const saveProfile = () => {
+    if (!currentUser) return;
+    const updatedUser: User = {
+      username: editUsername,
+      password: editPassword,
+      photo: editPhoto,
+    };
+    setUsers(users.map(u => u.username === currentUser.username ? updatedUser : u));
+    setCurrentUser(updatedUser);
+    setIsEditing(false);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setEditPhoto(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // Dashboard content
   const renderDashboardContent = () => {
-    switch(dashboardSection) {
-      case "profile": return (
-        <div className="content-card animate">
-          <h1>Profile</h1>
-          <p>Username: <strong>{currentUser?.username}</strong></p>
-        </div>
-      );
-      case "settings": return (
-        <div className="content-card animate">
-          <h1>Settings</h1>
-          <p>Customize your dashboard settings here.</p>
-        </div>
-      );
-      case "about": return (
-        <div className="content-card animate">
-          <h1>About</h1>
-          <p>This SaaS-style dashboard is built with React & TypeScript, with modern neumorphic UI.</p>
-        </div>
-      );
-      default: return null;
+    switch (dashboardSection) {
+      case "profile":
+        return (
+          <div className="content-card animate">
+            <h1>Profile</h1>
+            {!isEditing ? (
+              <>
+                <img src={currentUser?.photo || "/default-avatar.png"} className="profile-pic" alt="profile" />
+                <p>Username: <strong>{currentUser?.username}</strong></p>
+                <button className="btn" onClick={startEdit}>Edit Profile</button>
+              </>
+            ) : (
+              <>
+                <img src={editPhoto || "/default-avatar.png"} className="profile-pic" alt="preview" />
+                <input type="file" onChange={handlePhotoUpload} className="input" />
+                <input className="input" value={editUsername} onChange={e => setEditUsername(e.target.value)} placeholder="Username" />
+                <input className="input" type="password" value={editPassword} onChange={e => setEditPassword(e.target.value)} placeholder="Password" />
+                <button className="btn" onClick={saveProfile}>Save</button>
+                <button className="btn return-btn animate-return" onClick={() => setIsEditing(false)}>Cancel</button>
+              </>
+            )}
+          </div>
+        );
+
+      case "settings":
+        return <div className="content-card animate"><h1>Settings</h1><p>Customize your dashboard settings.</p></div>;
+      case "about":
+        return <div className="content-card animate"><h1>About</h1><p>Built with React & TypeScript.</p></div>;
+      default:
+        return null;
     }
   };
 
   return (
-    <div className="container">
+    <div className="container with-bg">
       {/* Home */}
-     {page === "home" && (
-  <div className="welcome-card animate-bounce">
-    <h1 className="welcome-title">Welcome to My Personal Dashboard</h1>
-    <div className="home-buttons">
-      <button className="btn" onClick={() => setPage("login")}>Login</button>
-      <button className="btn" onClick={() => setPage("register")}>Register</button>
-    </div>
-  </div>
-)}
+      {page === "home" && (
+        <div className="welcome-card animate-bounce">
+          <div className="home-buttons">
+            <button className="btn" onClick={() => setPage("login")}>Login</button>
+            <button className="btn" onClick={() => setPage("register")}>Register</button>
+          </div>
+        </div>
+      )}
 
       {/* Login */}
       {page === "login" && (
-        <div className="card neumorphic-card">
-          <h1 className="title">Login</h1>
-          <input className="input neumorphic-input" type="text" placeholder="Username" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} />
-          <input className="input neumorphic-input" type="password" placeholder="Password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
-          
-          <label className="remember-me">
-            <input type="checkbox" checked={rememberMe} onChange={() => setRememberMe(!rememberMe)} /> Remember Me
-          </label>
-
-          {loginError && <p className="error-msg">{loginError}</p>}
-          <button className="btn" onClick={handleLogin}>Login</button>
-          <span className="link" onClick={() => setPage("register")}>Don't have an account? Register</span>
-          <span className="link" onClick={() => setPage("home")}>Back to Home</span>
+        <div className="auth-wrapper animate-bounce">
+          <div className="auth-card neumorphic-card">
+            <h1>Login</h1>
+            <input className="input" placeholder="Username" value={loginUsername} onChange={e => setLoginUsername(e.target.value)} />
+            <input className="input" type="password" placeholder="Password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
+            {loginError && <p className="error-msg">{loginError}</p>}
+            <button className="btn" onClick={handleLogin}>Login</button>
+          </div>
+          <div className="auth-image">
+            <img src="/pexels-molnartamasphotography-33353366.jpg" alt="login" />
+          </div>
         </div>
       )}
 
       {/* Register */}
       {page === "register" && (
-        <div className="card neumorphic-card">
-          <h1 className="title">Register</h1>
-          <input className="input neumorphic-input" type="text" placeholder="Username" value={regUsername} onChange={(e) => setRegUsername(e.target.value)} />
-          <input className="input neumorphic-input" type="password" placeholder="Password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} />
-          {regError && <p className="error-msg">{regError}</p>}
-          <button className="btn" onClick={handleRegister}>Register</button>
-          <span className="link" onClick={() => setPage("login")}>Already have an account? Login</span>
-          <span className="link" onClick={() => setPage("home")}>Back to Home</span>
+        <div className="auth-wrapper animate-bounce">
+          <div className="auth-card neumorphic-card">
+            <h1>Register</h1>
+            <input className="input" placeholder="Username" value={regUsername} onChange={e => setRegUsername(e.target.value)} />
+            <input className="input" type="password" placeholder="Password" value={regPassword} onChange={e => setRegPassword(e.target.value)} />
+            {regError && <p className="error-msg">{regError}</p>}
+            <button className="btn" onClick={handleRegister}>Register</button>
+          </div>
+          <div className="auth-image">
+            <img src="/pexels-molnartamasphotography-33353366.jpg" alt="register" />
+          </div>
         </div>
       )}
 
       {/* Dashboard */}
       {page === "dashboard" && currentUser && (
         <div className="dashboard">
-          <div className="hamburger" onClick={() => setSidebarOpen(true)}>☰</div>
+          <div className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</div>
           {sidebarOpen && <div className="overlay" onClick={() => setSidebarOpen(false)}></div>}
-
           <div className={`sidebar ${sidebarOpen ? "open" : ""}`}>
             <h2>Menu</h2>
             <ul>
-              <li className={dashboardSection === "profile" ? "active" : ""} onClick={() => { setDashboardSection("profile"); setSidebarOpen(false); }}>
-                <span className="icon">👤</span>
-                <span className="text">Profile</span>
-              </li>
-              <li className={dashboardSection === "settings" ? "active" : ""} onClick={() => { setDashboardSection("settings"); setSidebarOpen(false); }}>
-                <span className="icon">⚙️</span>
-                <span className="text">Settings</span>
-              </li>
-              <li className={dashboardSection === "about" ? "active" : ""} onClick={() => { setDashboardSection("about"); setSidebarOpen(false); }}>
-                <span className="icon">ℹ️</span>
-                <span className="text">About</span>
-              </li>
-              <li onClick={handleLogout}>
-                <span className="icon">🔓</span>
-                <span className="text">Logout</span>
-              </li>
+              <li onClick={() => setDashboardSection("profile")}>👤 Profile</li>
+              <li onClick={() => setDashboardSection("settings")}>⚙️ Settings</li>
+              <li onClick={() => setDashboardSection("about")}>ℹ️ About</li>
+              <li onClick={handleLogout}>🔓 Logout</li>
             </ul>
           </div>
+          <div className="main">{renderDashboardContent()}</div>
+        </div>
+      )}
 
-          <div className="main">
-            {renderDashboardContent()}
-          </div>
+      {/* Global Return Button (only for login/register) */}
+      {page !== "home" && page !== "dashboard" && (
+        <div
+          className="return-btn animate-return"
+          onClick={() => setPage("home")}
+        >
+          ⬅ Return
         </div>
       )}
     </div>
